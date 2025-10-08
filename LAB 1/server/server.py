@@ -4,7 +4,7 @@ import sys
 import urllib.parse
 
 PORT = 8080
-HOST = 'localhost'
+HOST = "0.0.0.0"
 
 MIME_TYPES = {
     '.html': 'text/html',
