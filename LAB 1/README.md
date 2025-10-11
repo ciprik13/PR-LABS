@@ -189,15 +189,15 @@ My computer and my friend’s were connected to the same LAN, enabling direct in
 
 ### Finding IP Address of my friend
 Using Windows’ ipconfig command, my friend found their local IP address and provided it to me.
-![image.jpg](server/content/subdir/images/screenshot13.jpg)
+![image.png](server/content/subdir/images/screenshot13.png)
 
 ### My IP Address
 I verified my own IP using ifconfig (on macOS/Linux).
-![image.png](server/content/subdir/images/screenshot14.jpg)
+![image.png](server/content/subdir/images/screenshot14.png)
 
 ### Contents of Friend's Server
 The friend’s server hosted the following files:
-![img.png](server/content/subdir/images/screenshot15.jpg)
+![img.png](server/content/subdir/images/screenshot15.png)
 
 
 ### Requests to Friend's Server Using Your Client
@@ -211,7 +211,7 @@ ciprik13@Ciprian-MacBook-Air client % python3 client.py 192.168.1.214  8080 doc.
 File saved: downloads/doc.pdf (524526 bytes)
 ciprik13@Ciprian-MacBook-Air client %
 ```
-![img.jpg](server/content/subdir/images/screenshot16.jpg)
+![img.png](server/content/subdir/images/screenshot16.png)
 
 ## Conclusion
 This laboratory work successfully demonstrated the implementation of a complete HTTP file server and client system using raw TCP sockets in Python. The server was containerized using Docker, enabling efficient deployment and isolation, while supporting essential HTTP features including file serving, directory listing, and proper error handling with status codes. The client implementation successfully demonstrated the ability to download various file types (HTML, PDF, PNG) and handle both local and remote servers. The practical aspect of connecting to a friend's server over LAN reinforced understanding of network communication principles and the HTTP protocol. This hands-on experience provided valuable insights into client-server architecture, socket programming, and the fundamentals of web communication protocols.
