@@ -183,3 +183,40 @@ python3 client.py localhost 8080 /nonexistent.html ./downloads
 When accessing a directory URL (e.g., `/subdir/`), the server generates an HTML page listing all files in that directory.
 ![img.png](server/content/subdir/images/screenshot12.png)
 
+## 9. Browsing Friend's Server (Optional)
+### Network Setup
+My computer and my friend’s were connected to the same LAN, enabling direct interaction via their local IPs on port 8080. This setup used only TCP sockets and did not rely on VPNs or any internet-based tunneling.
+
+### Finding IP Address of my friend
+Using Windows’ ipconfig command, my friend found their local IP address and provided it to me.
+![image.jpg](server/content/subdir/images/screenshot13.jpg)
+
+### My IP Address
+I verified my own IP using ifconfig (on macOS/Linux).
+![image.png](server/content/subdir/images/screenshot14.jpg)
+
+### Contents of Friend's Server
+The friend’s server hosted the following files:
+![img.png](server/content/subdir/images/screenshot15.jpg)
+
+
+### Requests to Friend's Server Using Your Client
+I used my own HTTP client to connect and download files from my friend’s server.
+All files were successfully retrieved and saved into the local downloads/ directory.
+
+```py
+ciprik13@Ciprian-MacBook-Air client % python3 client.py 192.168.1.214  8080 image.png downloads
+File saved: downloads/image.png (645888 bytes)
+ciprik13@Ciprian-MacBook-Air client % python3 client.py 192.168.1.214  8080 doc.pdf downloads 
+File saved: downloads/doc.pdf (524526 bytes)
+ciprik13@Ciprian-MacBook-Air client %
+```
+![img.jpg](server/content/subdir/images/screenshot16.jpg)
+
+## Conclusion
+This laboratory work successfully demonstrated the implementation of a complete HTTP file server and client system using raw TCP sockets in Python. The server was containerized using Docker, enabling efficient deployment and isolation, while supporting essential HTTP features including file serving, directory listing, and proper error handling with status codes. The client implementation successfully demonstrated the ability to download various file types (HTML, PDF, PNG) and handle both local and remote servers. The practical aspect of connecting to a friend's server over LAN reinforced understanding of network communication principles and the HTTP protocol. This hands-on experience provided valuable insights into client-server architecture, socket programming, and the fundamentals of web communication protocols.
+
+## References
+1. [Python Socket Programming Documentation](https://docs.python.org/3/howto/sockets.html)
+2. [Docker 101 Tutorial](https://www.docker.com/101-tutorial/)
+3. [Sockets & Networking](https://web.mit.edu/6.031/www/fa20/classes/24-sockets-networking/)
