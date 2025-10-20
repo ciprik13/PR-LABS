@@ -16,6 +16,9 @@ MIME_TYPES = {
 
 request_counter = {}
 counter_lock = threading.Lock()
+rate_limit = {}
+rate_lock = threading.Lock()
+MAX_REQUESTS_PER_SEC = 5
 
 def get_content_type(file_path):
     _, extension = os.path.splitext(file_path)
@@ -50,17 +53,33 @@ def generate_directory_listing(dir_path, url_path):
     html += "</table></body></html>"
     return html.encode('utf-8')
 
+def check_rate_limit(client_ip):
+    now = time.time()
+    with rate_lock:
+        if client_ip not in rate_limit:
+            rate_limit[client_ip] = []
+        # păstrăm doar timestamp-urile în ultima 1 secundă
+        rate_limit[client_ip] = [t for t in rate_limit[client_ip] if now - t < 1.0]
+        if len(rate_limit[client_ip]) >= MAX_REQUESTS_PER_SEC:
+            return False
+        rate_limit[client_ip].append(now)
+        return True
+
 def handle_client(client_connection, client_address, content_dir, simulate_delay=True):
     try:
+        client_ip = client_address[0]
+        if not check_rate_limit(client_ip):
+            response = "HTTP/1.1 429 Too Many Requests\r\nContent-Type: text/html\r\n\r\n<h1>429 Too Many Requests</h1>".encode('utf-8')
+            client_connection.sendall(response)
+            return
+
         request = client_connection.recv(1024).decode('utf-8')
         if not request:
-            client_connection.close()
             return
 
         first_line = request.split('\n')[0]
         parts = first_line.split()
         if len(parts) < 2:
-            client_connection.close()
             return
 
         path = urllib.parse.unquote(parts[1])
