@@ -21,8 +21,7 @@ import { Board } from './board.js';
  *          described in the ps4 handout
  */
 export async function look(board: Board, playerId: string): Promise<string> {
-    throw new Error('look function not implemented');
-    // implement with glue code only, at most three lines
+    return board.look(playerId);
 }
 
 /**

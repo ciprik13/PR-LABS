@@ -245,4 +245,46 @@ export class Board {
 
     return new Board(rows, cols, cards);
   }
+
+  /**
+   * Get the current state of the board from a player's perspective.
+   *
+   * @param playerId the player viewing the board
+   * @returns board state string in the format: ROWSxCOLS\n(SPOT\n)+
+   *          where SPOT is one of: "none", "down", "up CARD", "my CARD"
+   */
+  public look(playerId: string): string {
+    if (!this.players.has(playerId)) {
+      this.players.set(playerId, {
+        firstCard: undefined,
+        previousCards: [],
+      });
+    }
+
+    let result = `${this.rows}x${this.cols}\n`;
+
+    for (let r = 0; r < this.rows; r++) {
+      const row = this.grid[r];
+      assert(row !== undefined);
+      for (let c = 0; c < this.cols; c++) {
+        const spot = row[c];
+        assert(spot !== undefined);
+
+        if (spot.state === "none") {
+          result += "none\n";
+        } else if (spot.state === "face-down") {
+          result += "down\n";
+        } else {
+          if (spot.controller === playerId) {
+            result += `my ${spot.card}\n`;
+          } else {
+            result += `up ${spot.card}\n`;
+          }
+        }
+      }
+    }
+
+    this.checkRep();
+    return result;
+  }
 }
