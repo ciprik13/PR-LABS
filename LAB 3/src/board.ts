@@ -19,6 +19,8 @@ type Spot = {
   card: string | undefined;
   state: CardState;
   controller: string | undefined;
+  // Waiters for this card - resolved when card becomes available
+  waiters: Array<() => void>;
 };
 
 /** Player state tracking */
@@ -52,6 +54,7 @@ export class Board {
   //       - if spot.state === 'face-down', then spot.card !== undefined and spot.controller === undefined
   //       - if spot.state === 'face-up', then spot.card !== undefined
   //       - if spot.controller !== undefined, then spot.state === 'face-up'
+  //       - spot.waiters is an array of callback functions
   //   - for all player states:
   //       - if firstCard is defined, then grid[firstCard.row][firstCard.col].controller === playerID
   //       - all positions in previousCards refer to valid grid positions
@@ -88,6 +91,7 @@ export class Board {
           card: cards[cardIndex++],
           state: "face-down",
           controller: undefined,
+          waiters: [],
         };
       }
     }
@@ -295,7 +299,7 @@ export class Board {
 
   /**
    * Attempt to flip a card at the specified position, following game rules.
-   * This is a synchronous version that will be made async in Problem 3.
+   * This method is asynchronous and supports waiting when a card is controlled by another player.
    *
    * @param playerId the player attempting the flip
    * @param row row position of the card
@@ -303,7 +307,11 @@ export class Board {
    * @returns board state string after the flip
    * @throws Error if the flip operation fails according to the rules
    */
-  public flip(playerId: string, row: number, col: number): string {
+  public async flip(
+    playerId: string,
+    row: number,
+    col: number
+  ): Promise<string> {
     // Ensure player exists
     if (!this.players.has(playerId)) {
       this.players.set(playerId, {
@@ -326,7 +334,7 @@ export class Board {
     // Check if this is a first card or second card flip
     if (playerState.firstCard === undefined) {
       // This is a FIRST CARD flip
-      return this.flipFirstCard(playerId, row, col, playerState, spot);
+      return await this.flipFirstCard(playerId, row, col, playerState, spot);
     } else {
       // This is a SECOND CARD flip
       return this.flipSecondCard(playerId, row, col, playerState, spot);
@@ -343,13 +351,13 @@ export class Board {
    * @param spot the spot being flipped
    * @returns board state after the flip
    */
-  private flipFirstCard(
+  private async flipFirstCard(
     playerId: string,
     row: number,
     col: number,
     playerState: PlayerState,
     spot: Spot
-  ): string {
+  ): Promise<string> {
     // Rule 3: Before flipping first card, clean up previous play
     this.cleanupPreviousPlay(playerId, playerState);
 
@@ -358,9 +366,12 @@ export class Board {
       throw new Error("no card at this position");
     }
 
-    // Rule 1-D: Card is controlled by another player (simplified for sync version - will throw)
+    // Rule 1-D: Card is controlled by another player - WAIT
     if (spot.controller !== undefined && spot.controller !== playerId) {
-      throw new Error("card is controlled by another player");
+      // Wait for the card to become available
+      await this.waitForCard(spot);
+      // After waiting, retry the flip
+      return await this.flipFirstCard(playerId, row, col, playerState, spot);
     }
 
     // Rule 1-B: Card is face down - flip it up
@@ -503,10 +514,12 @@ export class Board {
         firstSpot.state = "none";
         firstSpot.card = undefined;
         firstSpot.controller = undefined;
+        this.notifyWaiters(firstSpot);
 
         secondSpot.state = "none";
         secondSpot.card = undefined;
         secondSpot.controller = undefined;
+        this.notifyWaiters(secondSpot);
 
         playerState.previousCards = [];
         return;
@@ -529,7 +542,7 @@ export class Board {
   }
 
   /**
-   * Release control of a card (but keep it face up).
+   * Release control of a card (but keep it face up) and notify waiters.
    *
    * @param row row position of the card
    * @param col column position of the card
@@ -539,6 +552,40 @@ export class Board {
     const spot = this.grid[row]?.[col];
     if (spot !== undefined && spot.controller === playerId) {
       spot.controller = undefined;
+      // Notify all waiting players
+      this.notifyWaiters(spot);
     }
+  }
+
+  /**
+   * Wait for a card to become available (no longer controlled).
+   *
+   * @param spot the spot to wait for
+   * @returns a promise that resolves when the card becomes available
+   */
+  private async waitForCard(spot: Spot): Promise<void> {
+    // If card is already available, return immediately
+    if (spot.controller === undefined) {
+      return;
+    }
+
+    // Otherwise, create a promise and add it to waiters
+    const { promise, resolve } = Promise.withResolvers<void>();
+    spot.waiters.push(resolve);
+    return promise;
+  }
+
+  /**
+   * Notify all waiters that a card has become available.
+   *
+   * @param spot the spot whose waiters should be notified
+   */
+  private notifyWaiters(spot: Spot): void {
+    // Notify all waiters
+    for (const resolve of spot.waiters) {
+      resolve();
+    }
+    // Clear the waiters array
+    spot.waiters = [];
   }
 }

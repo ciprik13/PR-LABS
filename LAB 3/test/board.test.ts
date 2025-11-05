@@ -110,7 +110,7 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Flip a card for alice
-      board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 0);
       const state = board.look("alice");
 
       const lines = state.split("\n").filter((line) => line.length > 0);
@@ -121,7 +121,7 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips a card
-      board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 0);
 
       // Bob looks at the board
       const state = board.look("bob");
@@ -133,9 +133,35 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice matches the two unicorns at (0,0) and (0,1)
-      board.flip("alice", 0, 0); // first card
-      board.flip("alice", 0, 1); // second card (match!)
-      board.flip("alice", 1, 0); // trigger cleanup - cards should be removed
+      await board.flip("alice", 0, 0); // first card
+      await board.flip("alice", 0, 1); // second card (match!)
+      await board.flip("alice", 1, 0); // trigger cleanup - cards should be removed
+
+      const state = board.look("alice");
+      const lines = state.split("\n").filter((line) => line.length > 0);
+      assert.strictEqual(lines[1], "none", "First card should be removed");
+      assert.strictEqual(lines[2], "none", "Second card should be removed");
+    });
+
+    it('shows face-up card controlled by other player as "up"', async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Alice flips a card
+      await board.flip("alice", 0, 0);
+
+      // Bob looks at the board
+      const state = board.look("bob");
+      const lines = state.split("\n").filter((line) => line.length > 0);
+      assert(lines[1]?.startsWith("up "), `Expected "up" but got: ${lines[1]}`);
+    });
+
+    it('shows removed cards as "none"', async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Alice matches the two unicorns at (0,0) and (0,1)
+      await board.flip("alice", 0, 0); // first card
+      await board.flip("alice", 0, 1); // second card (match!)
+      await board.flip("alice", 1, 0); // trigger cleanup - cards should be removed
 
       const state = board.look("alice");
       const lines = state.split("\n").filter((line) => line.length > 0);
@@ -149,13 +175,13 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Create an empty spot by matching and removing cards
-      board.flip("alice", 0, 0);
-      board.flip("alice", 0, 1); // match
-      board.flip("alice", 1, 0); // cleanup - removes (0,0) and (0,1)
+      await board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 1); // match
+      await board.flip("alice", 1, 0); // cleanup - removes (0,0) and (0,1)
 
       // Try to flip the now-empty spot
-      assert.throws(
-        () => board.flip("alice", 0, 0),
+      await assert.rejects(
+        async () => await board.flip("alice", 0, 0),
         /no card at this position/
       );
     });
@@ -163,7 +189,7 @@ describe("Board", function () {
     it("flips face-down card to face-up and gives control", async function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
-      const state = board.flip("alice", 0, 0);
+      const state = await board.flip("alice", 0, 0);
       const lines = state.split("\n").filter((line) => line.length > 0);
 
       assert(lines[1]?.startsWith("my "), "Card should be controlled by alice");
@@ -173,37 +199,47 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips two non-matching cards
-      board.flip("alice", 0, 0);
-      board.flip("alice", 1, 0); // don't match
+      await board.flip("alice", 0, 0);
+      await board.flip("alice", 1, 0); // don't match
 
       // Bob flips a different card (this cleans up alice's cards - they stay face-up but uncontrolled)
-      board.flip("bob", 2, 2);
+      await board.flip("bob", 2, 2);
 
       // Alice takes control of her previous card again
-      const state = board.flip("alice", 0, 0);
+      const state = await board.flip("alice", 0, 0);
       const lines = state.split("\n").filter((line) => line.length > 0);
       assert(lines[1]?.startsWith("my "), "Alice should control the card");
     });
 
-    it("throws error when card is controlled by another player", async function () {
+    it("waits when card is controlled by another player", async function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips a card
-      board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 0);
 
-      // Bob tries to flip the same card
-      assert.throws(
-        () => board.flip("bob", 0, 0),
-        /card is controlled by another player/
-      );
+      // Bob tries to flip the same card - this should WAIT, not throw
+      // We'll start it but not await immediately
+      const bobPromise = board.flip("bob", 0, 0);
+
+      // Alice releases the card
+      await board.flip("alice", 1, 0); // Alice flips a second card
+
+      // Now Bob should be able to get control
+      await bobPromise; // This should succeed after alice releases
     });
 
     it("throws error for invalid coordinates", async function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
-      assert.throws(() => board.flip("alice", -1, 0), /invalid position/);
+      await assert.rejects(
+        async () => await board.flip("alice", -1, 0),
+        /invalid position/
+      );
 
-      assert.throws(() => board.flip("alice", 10, 10), /invalid position/);
+      await assert.rejects(
+        async () => await board.flip("alice", 10, 10),
+        /invalid position/
+      );
     });
   });
 
@@ -212,14 +248,14 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Create empty spots
-      board.flip("alice", 0, 0);
-      board.flip("alice", 0, 1); // match
-      board.flip("alice", 1, 0); // cleanup
+      await board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 1); // match
+      await board.flip("alice", 1, 0); // cleanup
 
       // Try second card on empty spot
-      board.flip("alice", 2, 0); // first card
-      assert.throws(
-        () => board.flip("alice", 0, 0), // empty spot
+      await board.flip("alice", 2, 0); // first card
+      await assert.rejects(
+        async () => await board.flip("alice", 0, 0), // empty spot
         /no card at this position/
       );
     });
@@ -228,14 +264,14 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips first card
-      board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 0);
 
       // Bob flips a card
-      board.flip("bob", 1, 0);
+      await board.flip("bob", 1, 0);
 
       // Alice tries to flip Bob's card as second card
-      assert.throws(
-        () => board.flip("alice", 1, 0),
+      await assert.rejects(
+        async () => await board.flip("alice", 1, 0),
         /card is controlled by a player/
       );
     });
@@ -244,8 +280,8 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // The board has 🦄 at (0,0) and (0,1)
-      board.flip("alice", 0, 0); // first card
-      const state = board.flip("alice", 0, 1); // second card - should match
+      await board.flip("alice", 0, 0); // first card
+      const state = await board.flip("alice", 0, 1); // second card - should match
 
       const lines = state.split("\n").filter((line) => line.length > 0);
       // Both cards should be controlled by alice
@@ -257,8 +293,8 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // (0,0) is 🦄, (1,0) is 🌈
-      board.flip("alice", 0, 0); // first card
-      const state = board.flip("alice", 1, 0); // second card - don't match
+      await board.flip("alice", 0, 0); // first card
+      const state = await board.flip("alice", 1, 0); // second card - don't match
 
       const lines = state.split("\n").filter((line) => line.length > 0);
       // Both cards should be face-up but not controlled
@@ -269,8 +305,8 @@ describe("Board", function () {
     it("flips face-down second card to face-up", async function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
-      board.flip("alice", 0, 0); // first card (face-down -> face-up)
-      board.flip("alice", 0, 2); // second card (face-down -> face-up)
+      await board.flip("alice", 0, 0); // first card (face-down -> face-up)
+      await board.flip("alice", 0, 2); // second card (face-down -> face-up)
 
       // Bob should see both cards face-up
       const state = board.look("bob");
@@ -285,11 +321,11 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Match cards at (0,0) and (0,1)
-      board.flip("alice", 0, 0);
-      board.flip("alice", 0, 1);
+      await board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 1);
 
       // Flip another card - should trigger removal
-      const state = board.flip("alice", 2, 0);
+      const state = await board.flip("alice", 2, 0);
       const lines = state.split("\n").filter((line) => line.length > 0);
 
       assert.strictEqual(lines[1], "none", "Matched card 1 should be removed");
@@ -300,8 +336,8 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Flip non-matching cards
-      board.flip("alice", 0, 0); // 🦄
-      board.flip("alice", 1, 0); // 🌈 - no match
+      await board.flip("alice", 0, 0); // 🦄
+      await board.flip("alice", 1, 0); // 🌈 - no match
 
       // Cards are face-up but not controlled
       let state = board.look("bob");
@@ -309,7 +345,7 @@ describe("Board", function () {
       assert(lines[1]?.startsWith("up "));
 
       // Alice flips another card - should turn previous cards face-down
-      board.flip("alice", 2, 0);
+      await board.flip("alice", 2, 0);
 
       state = board.look("bob");
       lines = state.split("\n").filter((line) => line.length > 0);
@@ -321,14 +357,14 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips non-matching cards
-      board.flip("alice", 0, 0);
-      board.flip("alice", 1, 0);
+      await board.flip("alice", 0, 0);
+      await board.flip("alice", 1, 0);
 
       // Bob takes control of one of alice's previous cards
-      board.flip("bob", 0, 0);
+      await board.flip("bob", 0, 0);
 
       // Alice flips next card - should not affect bob's card
-      board.flip("alice", 2, 0);
+      await board.flip("alice", 2, 0);
 
       const state = board.look("bob");
       const lines = state.split("\n").filter((line) => line.length > 0);
@@ -341,8 +377,8 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice plays and matches
-      board.flip("alice", 0, 0); // first card
-      board.flip("alice", 0, 1); // second card - match! (both controlled by alice)
+      await board.flip("alice", 0, 0); // first card
+      await board.flip("alice", 0, 1); // second card - match! (both controlled by alice)
 
       // Alice should control both cards
       let aliceState = board.look("alice");
@@ -352,15 +388,15 @@ describe("Board", function () {
       );
 
       // Bob plays
-      board.flip("bob", 1, 0); // first card -
-      board.flip("bob", 2, 0); // second card - match!
+      await board.flip("bob", 1, 0); // first card -
+      await board.flip("bob", 2, 0); // second card - match!
 
       // Bob should control his cards
       let bobState = board.look("bob");
       assert(bobState.includes("my "), "Bob should control his matched cards");
 
       // Now when Alice makes her next move, her previous matched cards should be removed
-      board.flip("alice", 2, 1); // this triggers cleanup of alice's matched pair
+      await board.flip("alice", 2, 1); // this triggers cleanup of alice's matched pair
 
       aliceState = board.look("alice");
       const aliceLines = aliceState.split("\n").filter((l) => l.length > 0);
@@ -384,15 +420,33 @@ describe("Board", function () {
       const board = await Board.parseFromFile("boards/perfect.txt");
 
       // Alice flips first card
-      board.flip("alice", 0, 0);
+      await board.flip("alice", 0, 0);
 
       // Bob flips his cards
-      board.flip("bob", 1, 1);
-      board.flip("bob", 1, 2);
+      await board.flip("bob", 1, 1);
+      await board.flip("bob", 1, 2);
 
       // Alice can still flip her second card
-      const state = board.flip("alice", 0, 1);
+      const state = await board.flip("alice", 0, 1);
       assert(state.includes("my "));
+    });
+
+    it("handles multiple concurrent waiters for same card", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Alice controls a card
+      await board.flip("alice", 0, 0);
+
+      // Bob and Charlie both try to flip it (they will wait)
+      const bobPromise = board.flip("bob", 0, 0);
+      const charliePromise = board.flip("charlie", 0, 0);
+
+      // Alice releases by flipping a second card
+      await board.flip("alice", 1, 0);
+
+      // Either Bob or Charlie should get it (we don't care which)
+      const results = await Promise.race([bobPromise, charliePromise]);
+      assert(results.includes("my "), "One player should control the card");
     });
   });
 });
