@@ -178,10 +178,15 @@ export class Board {
         } else if (spot.state === "face-down") {
           result += "[????] ";
         } else {
-          const ctrl = spot.controller
-            ? `*${spot.controller.substring(0, 1)}*`
-            : "   ";
-          result += `[${spot.card?.substring(0, 2).padEnd(2)}${ctrl}] `;
+          const ctrl =
+            spot.controller !== undefined && spot.controller.length > 0
+              ? `*${spot.controller.substring(0, 1)}*`
+              : "   ";
+          const cardDisplay =
+            spot.card !== undefined
+              ? spot.card.substring(0, 2).padEnd(2)
+              : "??";
+          result += `[${cardDisplay}${ctrl}] `;
         }
       }
       result += "\n";
@@ -330,6 +335,13 @@ export class Board {
 
   /**
    * Handle flipping the first card in a pair.
+   *
+   * @param playerId the player flipping the card
+   * @param row row position of the card
+   * @param col column position of the card
+   * @param playerState the player's current game state
+   * @param spot the spot being flipped
+   * @returns board state after the flip
    */
   private flipFirstCard(
     playerId: string,
@@ -380,6 +392,13 @@ export class Board {
 
   /**
    * Handle flipping the second card in a pair.
+   *
+   * @param playerId the player flipping the card
+   * @param row row position of the card
+   * @param col column position of the card
+   * @param playerState the player's current game state
+   * @param spot the spot being flipped
+   * @returns board state after the flip
    */
   private flipSecondCard(
     playerId: string,
@@ -430,16 +449,12 @@ export class Board {
     if (firstSpot.card === spot.card) {
       // Rule 2-D: Cards match - keep control of both
       spot.controller = playerId;
-      playerState.previousCards = [];
-      // Don't reset firstCard yet - it will be used to remove cards on next flip
-      const result = this.look(playerId);
-
       // Store both cards as matched pair for removal on next move
       playerState.previousCards = [playerState.firstCard, { row, col }];
       playerState.firstCard = undefined;
 
       this.checkRep();
-      return result;
+      return this.look(playerId);
     } else {
       // Rule 2-E: Cards don't match - relinquish control
       this.releaseCard(
@@ -457,6 +472,9 @@ export class Board {
 
   /**
    * Clean up from previous play according to Rule 3.
+   *
+   * @param playerId the player whose previous play is being cleaned up
+   * @param playerState the player's current game state
    */
   private cleanupPreviousPlay(
     playerId: string,
@@ -512,6 +530,10 @@ export class Board {
 
   /**
    * Release control of a card (but keep it face up).
+   *
+   * @param row row position of the card
+   * @param col column position of the card
+   * @param playerId the player releasing control
    */
   private releaseCard(row: number, col: number, playerId: string): void {
     const spot = this.grid[row]?.[col];
