@@ -287,4 +287,236 @@ export class Board {
     this.checkRep();
     return result;
   }
+
+  /**
+   * Attempt to flip a card at the specified position, following game rules.
+   * This is a synchronous version that will be made async in Problem 3.
+   *
+   * @param playerId the player attempting the flip
+   * @param row row position of the card
+   * @param col column position of the card
+   * @returns board state string after the flip
+   * @throws Error if the flip operation fails according to the rules
+   */
+  public flip(playerId: string, row: number, col: number): string {
+    // Ensure player exists
+    if (!this.players.has(playerId)) {
+      this.players.set(playerId, {
+        firstCard: undefined,
+        previousCards: [],
+      });
+    }
+
+    // Validate coordinates
+    if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) {
+      throw new Error(`invalid position (${row}, ${col})`);
+    }
+
+    const playerState = this.players.get(playerId);
+    assert(playerState !== undefined);
+
+    const spot = this.grid[row]?.[col];
+    assert(spot !== undefined);
+
+    // Check if this is a first card or second card flip
+    if (playerState.firstCard === undefined) {
+      // This is a FIRST CARD flip
+      return this.flipFirstCard(playerId, row, col, playerState, spot);
+    } else {
+      // This is a SECOND CARD flip
+      return this.flipSecondCard(playerId, row, col, playerState, spot);
+    }
+  }
+
+  /**
+   * Handle flipping the first card in a pair.
+   */
+  private flipFirstCard(
+    playerId: string,
+    row: number,
+    col: number,
+    playerState: PlayerState,
+    spot: Spot
+  ): string {
+    // Rule 3: Before flipping first card, clean up previous play
+    this.cleanupPreviousPlay(playerId, playerState);
+
+    // Rule 1-A: No card at this position
+    if (spot.state === "none") {
+      throw new Error("no card at this position");
+    }
+
+    // Rule 1-D: Card is controlled by another player (simplified for sync version - will throw)
+    if (spot.controller !== undefined && spot.controller !== playerId) {
+      throw new Error("card is controlled by another player");
+    }
+
+    // Rule 1-B: Card is face down - flip it up
+    if (spot.state === "face-down") {
+      spot.state = "face-up";
+      spot.controller = playerId;
+      playerState.firstCard = { row, col };
+      this.checkRep();
+      return this.look(playerId);
+    }
+
+    // Rule 1-C: Card is already face up but not controlled - take control
+    if (spot.state === "face-up" && spot.controller === undefined) {
+      spot.controller = playerId;
+      playerState.firstCard = { row, col };
+      this.checkRep();
+      return this.look(playerId);
+    }
+
+    // Card is already controlled by this player (re-flipping own card)
+    if (spot.controller === playerId) {
+      playerState.firstCard = { row, col };
+      this.checkRep();
+      return this.look(playerId);
+    }
+
+    throw new Error("unexpected state in flipFirstCard");
+  }
+
+  /**
+   * Handle flipping the second card in a pair.
+   */
+  private flipSecondCard(
+    playerId: string,
+    row: number,
+    col: number,
+    playerState: PlayerState,
+    spot: Spot
+  ): string {
+    assert(playerState.firstCard !== undefined);
+
+    // Rule 2-A: No card at this position
+    if (spot.state === "none") {
+      // Release control of first card
+      this.releaseCard(
+        playerState.firstCard.row,
+        playerState.firstCard.col,
+        playerId
+      );
+      playerState.previousCards = [playerState.firstCard];
+      playerState.firstCard = undefined;
+      throw new Error("no card at this position");
+    }
+
+    // Rule 2-B: Card is controlled by any player (including self)
+    if (spot.controller !== undefined) {
+      // Release control of first card
+      this.releaseCard(
+        playerState.firstCard.row,
+        playerState.firstCard.col,
+        playerId
+      );
+      playerState.previousCards = [playerState.firstCard];
+      playerState.firstCard = undefined;
+      throw new Error("card is controlled by a player");
+    }
+
+    // Card is face-down or face-up but not controlled
+    // Rule 2-C: Flip face-down card up
+    if (spot.state === "face-down") {
+      spot.state = "face-up";
+    }
+
+    // Now check if the cards match
+    const firstSpot =
+      this.grid[playerState.firstCard.row]?.[playerState.firstCard.col];
+    assert(firstSpot !== undefined);
+
+    if (firstSpot.card === spot.card) {
+      // Rule 2-D: Cards match - keep control of both
+      spot.controller = playerId;
+      playerState.previousCards = [];
+      // Don't reset firstCard yet - it will be used to remove cards on next flip
+      const result = this.look(playerId);
+
+      // Store both cards as matched pair for removal on next move
+      playerState.previousCards = [playerState.firstCard, { row, col }];
+      playerState.firstCard = undefined;
+
+      this.checkRep();
+      return result;
+    } else {
+      // Rule 2-E: Cards don't match - relinquish control
+      this.releaseCard(
+        playerState.firstCard.row,
+        playerState.firstCard.col,
+        playerId
+      );
+      playerState.previousCards = [playerState.firstCard, { row, col }];
+      playerState.firstCard = undefined;
+
+      this.checkRep();
+      return this.look(playerId);
+    }
+  }
+
+  /**
+   * Clean up from previous play according to Rule 3.
+   */
+  private cleanupPreviousPlay(
+    playerId: string,
+    playerState: PlayerState
+  ): void {
+    if (playerState.previousCards.length === 0) {
+      return;
+    }
+
+    // Check if previous cards were a match
+    if (playerState.previousCards.length === 2) {
+      const [first, second] = playerState.previousCards;
+      assert(first !== undefined && second !== undefined);
+
+      const firstSpot = this.grid[first.row]?.[first.col];
+      const secondSpot = this.grid[second.row]?.[second.col];
+
+      if (
+        firstSpot !== undefined &&
+        firstSpot.controller === playerId &&
+        secondSpot !== undefined &&
+        secondSpot.controller === playerId &&
+        firstSpot.card === secondSpot.card
+      ) {
+        // Rule 3-A: Matched pair - remove both cards
+        firstSpot.state = "none";
+        firstSpot.card = undefined;
+        firstSpot.controller = undefined;
+
+        secondSpot.state = "none";
+        secondSpot.card = undefined;
+        secondSpot.controller = undefined;
+
+        playerState.previousCards = [];
+        return;
+      }
+    }
+
+    // Rule 3-B: Non-matching cards - turn face down if possible
+    for (const pos of playerState.previousCards) {
+      const spot = this.grid[pos.row]?.[pos.col];
+      if (
+        spot !== undefined &&
+        spot.state === "face-up" &&
+        spot.controller === undefined
+      ) {
+        spot.state = "face-down";
+      }
+    }
+
+    playerState.previousCards = [];
+  }
+
+  /**
+   * Release control of a card (but keep it face up).
+   */
+  private releaseCard(row: number, col: number, playerId: string): void {
+    const spot = this.grid[row]?.[col];
+    if (spot !== undefined && spot.controller === playerId) {
+      spot.controller = undefined;
+    }
+  }
 }
