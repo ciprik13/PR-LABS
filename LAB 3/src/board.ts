@@ -34,9 +34,11 @@ export class Board {
   private readonly cols: number;
   private readonly grid: Spot[][];
   private readonly players: Map<string, PlayerState>;
+  // Watchers waiting for board changes
+  private readonly changeWatchers: Array<() => void>;
 
   // Abstraction function:
-  //   AF(rows, cols, grid, players) = a Memory Scramble game board with dimensions rows x cols
+  //   AF(rows, cols, grid, players, changeWatchers) = a Memory Scramble game board with dimensions rows x cols
   //     where grid[r][c] represents the spot at position (r, c):
   //       - grid[r][c].card is the card string at that position, or undefined if no card
   //       - grid[r][c].state is 'none' if no card, 'face-down' if card is face down, 'face-up' if face up
@@ -78,6 +80,7 @@ export class Board {
     this.rows = rows;
     this.cols = cols;
     this.players = new Map();
+    this.changeWatchers = [];
 
     // Initialize grid with face-down cards
     this.grid = [];
@@ -379,6 +382,7 @@ export class Board {
       spot.state = "face-up";
       spot.controller = playerId;
       playerState.firstCard = { row, col };
+      this.notifyChange();
       this.checkRep();
       return this.look(playerId);
     }
@@ -450,6 +454,7 @@ export class Board {
     // Rule 2-C: Flip face-down card up
     if (spot.state === "face-down") {
       spot.state = "face-up";
+      this.notifyChange();
     }
 
     // Now check if the cards match
@@ -521,12 +526,14 @@ export class Board {
         secondSpot.controller = undefined;
         this.notifyWaiters(secondSpot);
 
+        this.notifyChange();
         playerState.previousCards = [];
         return;
       }
     }
 
     // Rule 3-B: Non-matching cards - turn face down if possible
+    let changed = false;
     for (const pos of playerState.previousCards) {
       const spot = this.grid[pos.row]?.[pos.col];
       if (
@@ -535,7 +542,12 @@ export class Board {
         spot.controller === undefined
       ) {
         spot.state = "face-down";
+        changed = true;
       }
+    }
+
+    if (changed) {
+      this.notifyChange();
     }
 
     playerState.previousCards = [];
@@ -661,7 +673,48 @@ export class Board {
       }
     }
 
+    // Notify watchers of changes
+    this.notifyChange();
+
     this.checkRep();
     return this.look(playerId);
+  }
+
+  /**
+   * Watch for changes to the board.
+   * Waits until any cards turn face up or face down, are removed from the board,
+   * or change from one string to a different string.
+   *
+   * @param playerId the player watching the board
+   * @returns board state after a change occurs
+   */
+  public async watch(playerId: string): Promise<string> {
+    // Ensure player exists
+    if (!this.players.has(playerId)) {
+      this.players.set(playerId, {
+        firstCard: undefined,
+        previousCards: [],
+      });
+    }
+
+    // Wait for a change
+    const { promise, resolve } = Promise.withResolvers<void>();
+    this.changeWatchers.push(resolve);
+    await promise;
+
+    // Return updated board state
+    return this.look(playerId);
+  }
+
+  /**
+   * Notify all watchers that the board has changed.
+   */
+  private notifyChange(): void {
+    // Notify all watchers
+    for (const resolve of this.changeWatchers) {
+      resolve();
+    }
+    // Clear the watchers array
+    this.changeWatchers.length = 0;
   }
 }

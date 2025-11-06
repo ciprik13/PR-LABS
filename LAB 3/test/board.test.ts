@@ -537,6 +537,119 @@ describe("Board", function () {
       await Promise.all([mapPromise, flipPromise]);
     });
   });
+
+  describe("watch", function () {
+    it("waits for a change on the board", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Start watching
+      const watchPromise = board.watch("alice");
+
+      // Simulate a change after a short delay
+      setTimeout(async () => {
+        await board.flip("bob", 0, 0);
+      }, 10);
+
+      // Watch should resolve after the flip
+      const state = await watchPromise;
+      assert(state.includes("up"), "Board should show the flipped card");
+    });
+
+    it("notifies watchers on card flip", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      const watchPromise = board.watch("observer");
+
+      // Alice flips a card
+      setTimeout(async () => {
+        await board.flip("alice", 1, 1);
+      }, 10);
+
+      const state = await watchPromise;
+      assert(state.length > 0, "Watch should return board state after change");
+    });
+
+    it("notifies watchers on card removal", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Set up a match
+      await board.flip("alice", 0, 0); // First card
+      await board.flip("alice", 0, 1); // Matching second card
+
+      const watchPromise = board.watch("observer");
+
+      // Next move should remove the matched pair
+      setTimeout(async () => {
+        await board.flip("alice", 1, 0);
+      }, 10);
+
+      const state = await watchPromise;
+      assert(
+        state.length > 0,
+        "Watch should return board state after card removal"
+      );
+    });
+
+    it("notifies watchers on map transformation", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      const watchPromise = board.watch("observer");
+
+      // Transform all cards
+      setTimeout(async () => {
+        await board.map("alice", async (card: string) => `new-${card}`);
+      }, 10);
+
+      const state = await watchPromise;
+      assert(
+        state.length > 0,
+        "Watch should return board state after transformation"
+      );
+    });
+
+    it("supports multiple simultaneous watchers", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Multiple players watching
+      const watch1 = board.watch("observer1");
+      const watch2 = board.watch("observer2");
+      const watch3 = board.watch("observer3");
+
+      // Trigger a change
+      setTimeout(async () => {
+        await board.flip("alice", 0, 0);
+      }, 10);
+
+      // All watchers should be notified
+      const [state1, state2, state3] = await Promise.all([
+        watch1,
+        watch2,
+        watch3,
+      ]);
+
+      assert(state1.length > 0, "Observer 1 should get board state");
+      assert(state2.length > 0, "Observer 2 should get board state");
+      assert(state3.length > 0, "Observer 3 should get board state");
+    });
+
+    it("does not block other operations", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Start watching (will wait indefinitely until a change)
+      const watchPromise = board.watch("observer");
+
+      // Other operations should still work
+      const lookState = board.look("alice");
+      assert(lookState.length > 0, "Look should work while watch is waiting");
+
+      // Trigger the watch to complete
+      setTimeout(async () => {
+        await board.flip("bob", 0, 0);
+      }, 10);
+
+      await watchPromise;
+    });
+  });
 });
 
 /**
