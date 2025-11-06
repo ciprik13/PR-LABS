@@ -78,8 +78,7 @@ export async function map(
   playerId: string,
   f: (card: string) => Promise<string>
 ): Promise<string> {
-  throw new Error("map function not implemented");
-  // implement with glue code only, at most three lines
+  return await board.map(playerId, f);
 }
 
 /**

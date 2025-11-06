@@ -588,4 +588,80 @@ export class Board {
     // Clear the waiters array
     spot.waiters = [];
   }
+
+  /**
+   * Apply a transformer function to every card on the board.
+   * This operation maintains pairwise consistency: if two cards match at the start,
+   * they will continue to match during the transformation.
+   *
+   * @param playerId the player applying the transformation
+   * @param f transformer function from card to card (async)
+   * @returns board state after transformation
+   */
+  public async map(
+    playerId: string,
+    f: (card: string) => Promise<string>
+  ): Promise<string> {
+    // Ensure player exists
+    if (!this.players.has(playerId)) {
+      this.players.set(playerId, {
+        firstCard: undefined,
+        previousCards: [],
+      });
+    }
+
+    // Build a map of unique cards to their transformations
+    // This ensures pairwise consistency - same input always maps to same output
+    const transformCache = new Map<string, Promise<string>>();
+
+    // Collect all transformations
+    const transformations: Array<{
+      row: number;
+      col: number;
+      originalCard: string;
+      transformPromise: Promise<string>;
+    }> = [];
+
+    for (let r = 0; r < this.rows; r++) {
+      const row = this.grid[r];
+      assert(row !== undefined);
+      for (let c = 0; c < this.cols; c++) {
+        const spot = row[c];
+        assert(spot !== undefined);
+
+        if (spot.card !== undefined) {
+          // Get or create transformation for this card
+          let transformPromise = transformCache.get(spot.card);
+          if (transformPromise === undefined) {
+            transformPromise = f(spot.card);
+            transformCache.set(spot.card, transformPromise);
+          }
+
+          transformations.push({
+            row: r,
+            col: c,
+            originalCard: spot.card,
+            transformPromise,
+          });
+        }
+      }
+    }
+
+    // Wait for all transformations to complete
+    await Promise.all(transformations.map((t) => t.transformPromise));
+
+    // Apply all transformations atomically
+    for (const { row, col, transformPromise } of transformations) {
+      const spot = this.grid[row]?.[col];
+      assert(spot !== undefined);
+
+      if (spot.card !== undefined) {
+        const newCard = await transformPromise;
+        spot.card = newCard;
+      }
+    }
+
+    this.checkRep();
+    return this.look(playerId);
+  }
 }

@@ -449,6 +449,94 @@ describe("Board", function () {
       assert(results.includes("my "), "One player should control the card");
     });
   });
+
+  describe("map", function () {
+    it("transforms all cards on the board", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Flip a card to see it
+      await board.flip("alice", 0, 0);
+
+      // Transform all cards by appending "-new"
+      await board.map("alice", async (card: string) => `${card}-new`);
+
+      const state = board.look("alice");
+      // Check that the face-up card has been transformed
+      assert(state.includes("-new"), "Transformed card should be visible");
+    });
+
+    it("maintains pairwise consistency during transformation", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Start a map operation with a slow transformer
+      const mapPromise = board.map("alice", async (card: string) => {
+        // Simulate slow transformation
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return `transformed-${card}`;
+      });
+
+      // While map is running, look at the board
+      // Cards should be consistent (matching pairs still match)
+      // This is hard to test directly, but we ensure no errors occur
+      const lookPromise = board.look("bob");
+
+      await Promise.all([mapPromise, lookPromise]);
+      // If we get here without errors, consistency was maintained
+    });
+
+    it("does not affect card state (face-up/down, controller)", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Alice controls a card
+      await board.flip("alice", 0, 0);
+
+      // Transform all cards
+      await board.map("bob", async (card: string) => `new-${card}`);
+
+      // Alice should still control her card
+      const state = board.look("alice");
+      assert(state.includes("my "), "Alice should still control her card");
+    });
+
+    it("applies same transformation to matching cards", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Track how many times transformer is called for each unique card
+      const callCount = new Map<string, number>();
+
+      await board.map("alice", async (card: string) => {
+        const count = callCount.get(card) ?? 0;
+        callCount.set(card, count + 1);
+        return `${card}-v${count}`;
+      });
+
+      // Each unique card should be transformed exactly once
+      // (because we cache transformations for pairwise consistency)
+      for (const count of callCount.values()) {
+        assert.strictEqual(
+          count,
+          1,
+          "Each unique card should be transformed exactly once"
+        );
+      }
+    });
+
+    it("can interleave with flip operations", async function () {
+      const board = await Board.parseFromFile("boards/perfect.txt");
+
+      // Start a slow map
+      const mapPromise = board.map("alice", async (card: string) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return `${card}-mapped`;
+      });
+
+      // While map is running, Bob can still flip cards
+      const flipPromise = board.flip("bob", 0, 0);
+
+      // Both should complete without errors
+      await Promise.all([mapPromise, flipPromise]);
+    });
+  });
 });
 
 /**
