@@ -17,14 +17,18 @@ async function simulationMain(): Promise<void> {
   const filename = "boards/ab.txt";
   const board: Board = await Board.parseFromFile(filename);
   const size = 5;
-  const players = 3; // Multiple concurrent players
-  const tries = 20; // More attempts to stress test
-  const maxDelayMilliseconds = 100;
+  const players = 4; // 4 concurrent players as per requirements
+  const tries = 100; // 100 moves each as per requirements
+  const minDelayMilliseconds = 0.1; // Minimum timeout 0.1ms
+  const maxDelayMilliseconds = 2; // Maximum timeout 2ms
 
   console.log(
     `Starting simulation with ${players} players, ${tries} tries each`
   );
   console.log(`Board size: ${size}x${size}`);
+  console.log(
+    `Timeouts: ${minDelayMilliseconds}ms - ${maxDelayMilliseconds}ms`
+  );
   console.log("Testing concurrent gameplay without crashes...\n");
 
   // start up one or more players as concurrent asynchronous function calls
@@ -46,13 +50,19 @@ async function simulationMain(): Promise<void> {
 
     for (let jj = 0; jj < tries; ++jj) {
       try {
-        await timeout(Math.random() * maxDelayMilliseconds);
+        await timeout(
+          minDelayMilliseconds +
+            Math.random() * (maxDelayMilliseconds - minDelayMilliseconds)
+        );
         // Try to flip over a first card at random position
         const firstRow = randomInt(size);
         const firstCol = randomInt(size);
         await board.flip(playerId, firstRow, firstCol);
 
-        await timeout(Math.random() * maxDelayMilliseconds);
+        await timeout(
+          minDelayMilliseconds +
+            Math.random() * (maxDelayMilliseconds - minDelayMilliseconds)
+        );
         // Try to flip over a second card at random position
         const secondRow = randomInt(size);
         const secondCol = randomInt(size);
