@@ -173,8 +173,8 @@ def replicate():
 def replicate_to_followers(key, value):
     """
     Replicate data to followers with simulated network delay.
-    Returns (success_count, list_of_individual_latencies).
-    Uses concurrent requests with individual delays.
+    Returns as soon as WRITE_QUORUM confirmations are received.
+    This is TRUE semi-synchronous replication.
     """
     def replicate_to_one_follower(follower_url):
         start = time.time()
@@ -213,13 +213,20 @@ def replicate_to_followers(key, value):
             for follower in FOLLOWERS
         }
         
+        # Return AS SOON AS we have enough successful replications
         for future in as_completed(futures):
             success, latency = future.result()
             if success:
                 success_count += 1
                 all_latencies.append(latency)
-    
-    return success_count, all_latencies
+                
+                # CRITICAL: Return immediately when quorum is reached!
+                if success_count >= WRITE_QUORUM:
+                    logger.debug(f"Quorum {WRITE_QUORUM} reached, returning early")
+                    return success_count, all_latencies
+        
+        # If we get here, quorum was not reached
+        return success_count, all_latencies
 
 
 @app.route('/get_all', methods=['GET'])
