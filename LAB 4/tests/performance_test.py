@@ -13,9 +13,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 LEADER_URL = "http://localhost:5050"
 FOLLOWER_URLS = [f"http://localhost:500{i}" for i in range(1, 6)]
 
-NUM_WRITES = 10000
-NUM_KEYS = 100
-NUM_THREADS = 20
+NUM_WRITES = 100   # Start small for testing with large delays
+NUM_KEYS = 20      # Fewer keys for initial testing
+NUM_THREADS = 5    # Fewer threads to avoid overwhelming with large delays
 
 
 def write_key_value(key, value):

@@ -28,8 +28,8 @@ data_lock = threading.Lock()
 # Configuration from environment variables
 NODE_TYPE = os.getenv('NODE_TYPE', 'leader')  # 'leader' or 'follower'
 WRITE_QUORUM = int(os.getenv('WRITE_QUORUM', '3'))  # Number of confirmations needed
-MIN_DELAY = float(os.getenv('MIN_DELAY', '0.0001'))  # 0.1ms
-MAX_DELAY = float(os.getenv('MAX_DELAY', '0.001'))    # 1ms
+MIN_DELAY = float(os.getenv('MIN_DELAY', '0.0'))  # 0ms
+MAX_DELAY = float(os.getenv('MAX_DELAY', '1.0'))    # 1000ms (1 second)
 PORT = int(os.getenv('PORT', '5000'))
 
 # Follower addresses
@@ -37,7 +37,7 @@ FOLLOWERS = [f"http://follower{i}:5000" for i in range(1, 6)]
 
 logger.info(f"Starting {NODE_TYPE} node on port {PORT}")
 logger.info(f"Write quorum: {WRITE_QUORUM}")
-logger.info(f"Delay range: {MIN_DELAY*1000:.2f}ms - {MAX_DELAY*1000:.2f}ms")
+logger.info(f"Delay range: {MIN_DELAY*1000:.0f}ms - {MAX_DELAY*1000:.0f}ms")
 
 
 @app.route('/health', methods=['GET'])
