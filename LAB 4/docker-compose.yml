@@ -11,8 +11,8 @@ services:
       - NODE_TYPE=leader
       - PORT=5000
       - WRITE_QUORUM=5
-      - MIN_DELAY=0.0001
-      - MAX_DELAY=0.001
+      - MIN_DELAY=0.0
+      - MAX_DELAY=1.0
     networks:
       - network
     depends_on:
