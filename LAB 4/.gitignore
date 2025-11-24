@@ -13,6 +13,6 @@ build/
 htmlcov/
 *.log
 .DS_Store
-*.png
 results/
 venv/
+README_RO.md
