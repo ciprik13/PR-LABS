@@ -15,5 +15,6 @@ htmlcov/
 .DS_Store
 results/
 results1/
+results2/
 venv/
 README_RO.md

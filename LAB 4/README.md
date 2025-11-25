@@ -649,7 +649,7 @@ The visualization shows three key plots:
 
 **Visual Analysis**:
 
-![Quorum Analysis Results](tests/quorum_analysis2.png)
+![Quorum Analysis Results](tests/quorum_analysis1.1.png)
 
 ### 4. Latency vs Quorum Comparison
 
