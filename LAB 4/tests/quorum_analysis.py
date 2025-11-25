@@ -97,7 +97,7 @@ def check_consistency():
 
 
 def plot_quorum_analysis(all_results):
-    """Generate comprehensive plots for quorum analysis"""
+    """Generate plot for quorum analysis - single chart showing latency vs quorum"""
     os.makedirs('results', exist_ok=True)
     
     quorums = [r['quorum'] for r in all_results]
@@ -107,67 +107,23 @@ def plot_quorum_analysis(all_results):
     median_repl_latencies = [r.get('median_repl_latency', r['median_latency']) for r in all_results]
     p95_repl_latencies = [r.get('p95_repl_latency', r['p95_latency']) for r in all_results]
     
-    throughputs = [r['throughput'] for r in all_results]
-    success_rates = [r['success_rate'] for r in all_results]
+    # Create a single large plot
+    fig, ax = plt.subplots(figsize=(12, 8))
     
-    # Create a 2x2 subplot figure
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+    # Plot Average Replication Latency vs Quorum with three lines
+    ax.plot(quorums, avg_repl_latencies, 'o-', linewidth=3, markersize=10, label='Mean', color='blue')
+    ax.plot(quorums, median_repl_latencies, 's-', linewidth=3, markersize=10, label='Median', color='green')
+    ax.plot(quorums, p95_repl_latencies, '^-', linewidth=3, markersize=10, label='P95', color='red')
     
-    # Plot 1: Average Replication Latency vs Quorum
-    ax1.plot(quorums, avg_repl_latencies, 'o-', linewidth=2, markersize=8, label='Average', color='blue')
-    ax1.plot(quorums, median_repl_latencies, 's-', linewidth=2, markersize=8, label='Median', color='green')
-    ax1.plot(quorums, p95_repl_latencies, '^-', linewidth=2, markersize=8, label='P95', color='red')
-    ax1.set_xlabel('Write Quorum', fontsize=12)
-    ax1.set_ylabel('Avg Replication Latency (ms)', fontsize=12)
-    ax1.set_title('Write Quorum vs Average Replication Latency', fontsize=14, fontweight='bold')
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
-    ax1.set_xticks(quorums)
+    ax.set_xlabel('Write Quorum', fontsize=14, fontweight='bold')
+    ax.set_ylabel('Avg Replication Latency (ms)', fontsize=14, fontweight='bold')
+    ax.set_title('Write Quorum vs Average Replication Latency', fontsize=16, fontweight='bold', pad=20)
+    ax.grid(True, alpha=0.3, linestyle='--')
+    ax.legend(fontsize=12, loc='upper left')
+    ax.set_xticks(quorums)
     
-    # Plot 2: Throughput
-    ax2.plot(quorums, throughputs, 'o-', linewidth=2, markersize=8, color='purple')
-    ax2.set_xlabel('Write Quorum', fontsize=12)
-    ax2.set_ylabel('Throughput (writes/sec)', fontsize=12)
-    ax2.set_title('Write Quorum vs Throughput', fontsize=14, fontweight='bold')
-    ax2.grid(True, alpha=0.3)
-    ax2.set_xticks(quorums)
-    
-    # Plot 3: Success Rate
-    ax3.bar(quorums, success_rates, color='steelblue', alpha=0.7)
-    ax3.set_xlabel('Write Quorum', fontsize=12)
-    ax3.set_ylabel('Success Rate (%)', fontsize=12)
-    ax3.set_title('Write Quorum vs Success Rate', fontsize=14, fontweight='bold')
-    ax3.grid(True, alpha=0.3, axis='y')
-    ax3.set_xticks(quorums)
-    ax3.set_ylim([0, 105])
-    
-    # Plot 4: Summary Table
-    ax4.axis('tight')
-    ax4.axis('off')
-    
-    table_data = []
-    table_data.append(['Quorum', 'Avg Repl\nLatency (ms)', 'Throughput\n(writes/s)', 'Success\nRate (%)'])
-    for r in all_results:
-        avg_lat = r.get('avg_repl_latency', r['avg_latency'])
-        table_data.append([
-            str(r['quorum']),
-            f"{avg_lat:.2f}",
-            f"{r['throughput']:.1f}",
-            f"{r['success_rate']:.1f}"
-        ])
-    
-    table = ax4.table(cellText=table_data, cellLoc='center', loc='center',
-                     colWidths=[0.2, 0.3, 0.3, 0.2])
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 2)
-    
-    # Style header row
-    for i in range(4):
-        table[(0, i)].set_facecolor('#4472C4')
-        table[(0, i)].set_text_props(weight='bold', color='white')
-    
-    ax4.set_title('Performance Summary', fontsize=14, fontweight='bold', pad=20)
+    # Increase tick label size
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
     plt.tight_layout()
     plt.savefig('results/quorum_analysis.png', dpi=300, bbox_inches='tight')

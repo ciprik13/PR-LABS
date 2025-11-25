@@ -14,5 +14,6 @@ htmlcov/
 *.log
 .DS_Store
 results/
+results1/
 venv/
 README_RO.md
